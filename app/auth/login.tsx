@@ -47,16 +47,11 @@ export default function Login() {
   };
 
   return (
-    <AuthScreenLayout onBack={() => router.replace('/onboarding')}>
-      <AppText variant="caption" style={styles.kicker}>
-        welcome in
-      </AppText>
-      <AppText variant="body" style={styles.sub}>
-        Sign in or create an account with email. Clients and students both use the same login — you'll
-        pick your role next.
-      </AppText>
-
-      <View style={{ height: space.lg }} />
+    <AuthScreenLayout
+      onBack={() => router.replace('/onboarding')}
+      heroTitle="Hello!"
+      heroSubtitle="Welcome to SkillBee — sign in or create your account.">
+      <View style={{ height: space.sm }} />
 
       {savedSessionEmail ? (
         <>
@@ -97,17 +92,6 @@ export default function Login() {
 }
 
 const styles = StyleSheet.create({
-  kicker: {
-    textTransform: 'lowercase',
-    fontWeight: '800',
-    letterSpacing: 1,
-    color: 'rgba(10,10,10,0.55)',
-  },
-  sub: {
-    marginTop: space.xs,
-    lineHeight: 22,
-    color: 'rgba(10,10,10,0.78)',
-  },
   forgotWrap: {
     marginTop: space.lg,
     alignItems: 'center',

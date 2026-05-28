@@ -4,20 +4,30 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { SkillBeeLogo } from '@/components/brand/SkillBeeLogo';
+import { AppText } from '@/components/ui/AppText';
 import { HoneycombBackground } from '@/components/backgrounds/HoneycombBackground';
 import { useAppColorScheme } from '@/hooks/useThemeColors';
-import { layout, palette, radii, space } from '@/theme';
+import { fontWeights, layout, palette, radii, space } from '@/theme';
 
 type Props = {
   children: ReactNode;
   /** Show back chevron (calls onBack). */
   onBack?: () => void;
+  /** Bold line under the logo (yellow area). */
+  heroTitle?: string;
+  /** Optional second line under heroTitle. */
+  heroSubtitle?: string;
 };
 
 /**
- * Yellow honeycomb hero with logo above; cream form card sits lower on the screen.
+ * Yellow honeycomb hero: logo + greeting on top, cream form card below (compact, aligned).
  */
-export function AuthScreenLayout({ children, onBack }: Props) {
+export function AuthScreenLayout({
+  children,
+  onBack,
+  heroTitle = 'Hello!',
+  heroSubtitle,
+}: Props) {
   const scheme = useAppColorScheme();
 
   return (
@@ -38,16 +48,28 @@ export function AuthScreenLayout({ children, onBack }: Props) {
             <View style={styles.backSpacer} />
           )}
 
-          <View style={styles.logoZone}>
-            <SkillBeeLogo size="authHero" />
-          </View>
-
           <ScrollView
             style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
             bounces={false}>
+            <View style={styles.heroBlock}>
+              <View style={styles.logoWrap}>
+                <SkillBeeLogo size="authHero" />
+              </View>
+              {heroTitle ? (
+                <AppText variant="hero" style={styles.heroTitle}>
+                  {heroTitle}
+                </AppText>
+              ) : null}
+              {heroSubtitle ? (
+                <AppText variant="body" style={styles.heroSubtitle}>
+                  {heroSubtitle}
+                </AppText>
+              ) : null}
+            </View>
+
             <View style={styles.card}>{children}</View>
           </ScrollView>
         </View>
@@ -77,24 +99,40 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   backSpacer: {
-    height: space.md,
-  },
-  logoZone: {
-    flex: 1,
-    minHeight: 140,
-    maxHeight: 260,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: space.md,
+    height: space.sm,
   },
   scroll: {
-    flexGrow: 0,
-    flexShrink: 1,
+    flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'flex-end',
     paddingBottom: space.lg,
+    justifyContent: 'center',
+    gap: space.lg,
+  },
+  heroBlock: {
+    alignItems: 'center',
+    paddingTop: space.xs,
+    paddingBottom: space.xs,
+    gap: space.xxs,
+  },
+  logoWrap: {
+    marginBottom: -18,
+  },
+  heroTitle: {
+    marginTop: 0,
+    textAlign: 'center',
+    color: palette.black,
+    letterSpacing: -0.5,
+    fontWeight: fontWeights.heavy,
+  },
+  heroSubtitle: {
+    marginTop: space.xs,
+    textAlign: 'center',
+    color: 'rgba(10,10,10,0.72)',
+    lineHeight: 22,
+    paddingHorizontal: space.md,
+    maxWidth: 340,
   },
   card: {
     backgroundColor: palette.cream,

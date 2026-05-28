@@ -108,13 +108,16 @@ export default function SignUp() {
   };
 
   return (
-    <AuthScreenLayout onBack={() => router.back()}>
+    <AuthScreenLayout
+      onBack={() => router.back()}
+      heroTitle="Hello!"
+      heroSubtitle="Create your SkillBee account">
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <AppText variant="title" style={styles.heading}>
-          Create account
+        <AppText variant="subtitle" style={styles.heading}>
+          Sign up with email
         </AppText>
-        <AppText variant="body" style={styles.hint}>
-          Same account for client and student — you’ll choose after this step.
+        <AppText variant="caption" style={styles.hint}>
+          Client or student — you’ll pick your role next.
         </AppText>
 
         <AppText variant="caption" style={styles.label}>

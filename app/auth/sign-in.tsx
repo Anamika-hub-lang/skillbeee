@@ -90,12 +90,15 @@ export default function SignIn() {
   };
 
   return (
-    <AuthScreenLayout onBack={() => router.back()}>
+    <AuthScreenLayout
+      onBack={() => router.back()}
+      heroTitle="Hello!"
+      heroSubtitle="Log in to your account">
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <AppText variant="title" style={styles.heading}>
-          Log in
+        <AppText variant="subtitle" style={styles.heading}>
+          Log in with email
         </AppText>
-        <AppText variant="body" style={styles.hint}>
+        <AppText variant="caption" style={styles.hint}>
           Use the email and password you signed up with.
         </AppText>
 
