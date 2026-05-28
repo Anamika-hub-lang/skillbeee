@@ -1,28 +1,51 @@
-import { useRouter } from 'expo-router';
+import { Redirect, useRootNavigationState } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
   useSharedValue,
-  withRepeat,
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
 
+import { HoneycombBackground } from '@/components/backgrounds/HoneycombBackground';
+import { SkillBeeLogo } from '@/components/brand/SkillBeeLogo';
 import { AppText } from '@/components/ui/AppText';
+import { useAppColorScheme } from '@/hooks/useThemeColors';
+import { isSupabaseConfigured } from '@/lib/supabase';
 import { useSessionStore } from '@/stores/session';
 import { palette, space } from '@/theme';
 
+/**
+ * Entry: show branded splash until persist + min time + root navigator are ready,
+ * then use <Redirect /> (reliable on Android — router.replace before nav mount = white screen).
+ */
 export default function Entry() {
-  const router = useRouter();
   const hydrated = useSessionStore((s) => s.hydrated);
+  const supabaseAuthReady = useSessionStore((s) => s.supabaseAuthReady);
+  const onboardingComplete = useSessionStore((s) => s.onboardingComplete);
+  const authFlowComplete = useSessionStore((s) => s.authFlowComplete);
+  const isAuthenticated = useSessionStore((s) => s.isAuthenticated);
+  const role = useSessionStore((s) => s.role);
+  const studentProfileComplete = useSessionStore((s) => s.studentProfileComplete);
+  const clientProfileComplete = useSessionStore((s) => s.clientProfileComplete);
+  const rootNav = useRootNavigationState();
+  const scheme = useAppColorScheme();
   const [minElapsed, setMinElapsed] = useState(false);
   const scale = useSharedValue(0.86);
-  const rotate = useSharedValue(-6);
 
   useEffect(() => {
-    const t = setTimeout(() => setMinElapsed(true), 1100);
+    const t = setTimeout(() => setMinElapsed(true), 5000);
+    return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (!useSessionStore.getState().hydrated) {
+        useSessionStore.getState().setHydrated(true);
+      }
+    }, 3000);
     return () => clearTimeout(t);
   }, []);
 
@@ -31,75 +54,72 @@ export default function Entry() {
       withTiming(1.05, { duration: 520, easing: Easing.out(Easing.cubic) }),
       withTiming(1, { duration: 220 }),
     );
-    rotate.value = withSequence(
-      withTiming(0, { duration: 520 }),
-      withRepeat(
-        withSequence(
-          withTiming(4, { duration: 900 }),
-          withTiming(-4, { duration: 900 }),
-        ),
-        -1,
-        true,
-      ),
-    );
-  }, [rotate, scale]);
+  }, [scale]);
 
   const logoStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }, { rotate: `${rotate.value}deg` }],
+    transform: [{ scale: scale.value }],
   }));
 
-  useEffect(() => {
-    if (!hydrated || !minElapsed) return;
-    const s = useSessionStore.getState();
-    if (!s.onboardingComplete) {
-      router.replace('/onboarding');
-      return;
-    }
-    if (!s.isAuthenticated) {
-      router.replace('/auth/login');
-      return;
-    }
-    if (!s.role) {
-      router.replace('/role');
-      return;
-    }
-    if (s.role === 'student' && !s.studentProfileComplete) {
-      router.replace('/student-setup');
-      return;
-    }
-    router.replace('/(tabs)/discover');
-  }, [hydrated, minElapsed, router]);
+  const navReady = Boolean(rootNav?.key);
+  const authGateOk = !isSupabaseConfigured() || supabaseAuthReady;
+  const ready = hydrated && minElapsed && navReady && authGateOk;
 
-  return (
-    <View style={styles.root}>
-      <Animated.View style={[styles.mark, logoStyle]}>
-        <AppText variant="hero" style={styles.wordmark}>
-          SkillBee
-        </AppText>
-      </Animated.View>
-      <AppText variant="caption" muted center style={{ marginTop: space.md }}>
-        micro-gigs. mega vibes.
-      </AppText>
-    </View>
-  );
+  if (!ready) {
+    return (
+      <View style={styles.root}>
+        <HoneycombBackground scheme={scheme} surface="yellow" opacity={0.96} />
+        <View style={styles.splashContent}>
+          <Animated.View style={logoStyle}>
+            <SkillBeeLogo size="splash" style={styles.logoCenter} />
+          </Animated.View>
+          <AppText variant="caption" center style={styles.tagline}>
+            micro-gigs. mega vibes.
+          </AppText>
+        </View>
+      </View>
+    );
+  }
+
+  if (!onboardingComplete) {
+    return <Redirect href="/onboarding" />;
+  }
+  if (!authFlowComplete || !isAuthenticated) {
+    return <Redirect href="/auth/login" />;
+  }
+  if (!role) {
+    return <Redirect href="/role" />;
+  }
+  if (role === 'student' && !studentProfileComplete) {
+    return <Redirect href="/student-setup" />;
+  }
+  if (role === 'client' && !clientProfileComplete) {
+    return <Redirect href="/client-setup" />;
+  }
+  if (role === 'client') {
+    return <Redirect href="/(tabs)/client-home" />;
+  }
+  return <Redirect href="/(tabs)/discover" />;
 }
 
 const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: palette.yellow,
+  },
+  splashContent: {
+    ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: space.xl,
+    zIndex: 1,
   },
-  mark: {
-    paddingHorizontal: space.xl,
-    paddingVertical: space.lg,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.35)',
+  logoCenter: {
+    alignSelf: 'center',
   },
-  wordmark: {
-    color: palette.black,
-    letterSpacing: -0.5,
+  tagline: {
+    marginTop: space.lg,
+    color: 'rgba(10,10,10,0.65)',
+    letterSpacing: 0.4,
+    fontWeight: '700',
   },
 });

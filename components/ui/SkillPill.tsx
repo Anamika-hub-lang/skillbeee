@@ -17,7 +17,7 @@ export function SkillPill({ label, selected, onPress }: Props) {
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [
+      style={({ pressed }: { pressed: boolean }) => [
         styles.pill,
         {
           backgroundColor: selected ? t.text : t.surface,

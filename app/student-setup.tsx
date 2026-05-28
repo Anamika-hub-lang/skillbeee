@@ -1,7 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Pressable,
   StyleSheet,
   Switch,
@@ -14,22 +17,42 @@ import { BeeButton } from '@/components/ui/BeeButton';
 import { BeeCard } from '@/components/ui/BeeCard';
 import { Screen } from '@/components/ui/Screen';
 import { SkillPill } from '@/components/ui/SkillPill';
-import { SKILL_SUGGESTIONS } from '@/data/dummy';
-import { useSessionStore } from '@/stores/session';
+import { SKILL_SUGGESTIONS } from '@/data/skills';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import { fontSizes, radii, space } from '@/theme';
+import { updateUserProfile } from '@/lib/data/profileAndDashboard';
+import { syncAccountProgressFromServer, profileCompleteForAccount } from '@/lib/auth/syncAccountProgress';
+import { pickProfileImage, type PickedProfileImage } from '@/lib/pickProfileImage';
+import { supabase } from '@/lib/supabase';
+import { uploadProfilePhotoFromUri } from '@/lib/uploadProfilePhoto';
+import { useSessionStore } from '@/stores/session';
+import { fontSizes, palette, radii, space } from '@/theme';
 
 export default function StudentSetup() {
   const router = useRouter();
   const t = useThemeColors();
   const setProfile = useSessionStore((s) => s.setStudentProfile);
   const finish = useSessionStore((s) => s.completeStudentSetup);
+  const [checking, setChecking] = useState(true);
 
-  const [name, setName] = useState('Alex');
-  const [rate, setRate] = useState('28');
-  const [note, setNote] = useState('Nights & weekends');
+  useEffect(() => {
+    void syncAccountProgressFromServer().then(({ role, profileComplete }) => {
+      const store = useSessionStore.getState();
+      const done = profileCompleteForAccount(role, profileComplete, store.accountUserId);
+      if (role === 'student' && done) {
+        router.replace('/(tabs)/discover');
+        return;
+      }
+      setChecking(false);
+    });
+  }, [router]);
+
+  const [name, setName] = useState('');
+  const [rate, setRate] = useState('500');
+  const [note, setNote] = useState('');
   const [availableNow, setAvailableNow] = useState(true);
-  const [skills, setSkills] = useState<string[]>(['Canva', 'Shopify']);
+  const [skills, setSkills] = useState<string[]>([]);
+  const [pickedPhoto, setPickedPhoto] = useState<PickedProfileImage | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const suggestions = useMemo(() => SKILL_SUGGESTIONS, []);
 
@@ -39,21 +62,102 @@ export default function StudentSetup() {
     );
   };
 
+  const pickPhoto = () => {
+    void (async () => {
+      const picked = await pickProfileImage();
+      if (picked) setPickedPhoto(picked);
+    })();
+  };
+
+  const submit = () => {
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      Alert.alert('Name', 'Please enter your display name.');
+      return;
+    }
+
+    void (async () => {
+      setSaving(true);
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (!session?.user?.id) throw new Error('Sign in required.');
+
+        let photoUrl: string | undefined;
+        if (pickedPhoto) {
+          photoUrl = await uploadProfilePhotoFromUri(
+            pickedPhoto.uri,
+            pickedPhoto.fileName,
+            pickedPhoto.mimeType,
+            pickedPhoto.base64,
+          );
+        }
+
+        const hourlyRate = Number.parseInt(rate, 10) || 500;
+        await updateUserProfile(session.user.id, {
+          displayName: trimmedName,
+          skills,
+          hourlyRate,
+          availabilityNote: note.trim() || null,
+          availableNow,
+          ...(photoUrl ? { photoUrl } : {}),
+        });
+
+        const verified = await syncAccountProgressFromServer();
+        if (!verified.profileComplete) {
+          throw new Error('Profile saved but could not be verified. Check your connection and try again.');
+        }
+
+        setProfile({
+          displayName: trimmedName,
+          skills,
+          hourlyRate,
+          availabilityNote: note.trim(),
+          availableNow,
+          photoUri: photoUrl ?? pickedPhoto?.uri ?? undefined,
+        });
+        finish();
+        router.replace('/(tabs)/discover');
+      } catch (e) {
+        Alert.alert('Setup failed', e instanceof Error ? e.message : 'Could not save your profile.');
+      } finally {
+        setSaving(false);
+      }
+    })();
+  };
+
+  if (checking) {
+    return (
+      <Screen>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator size="large" color={palette.yellow} />
+        </View>
+      </Screen>
+    );
+  }
+
   return (
     <Screen scroll>
       <AppText variant="title" style={{ marginBottom: space.sm }}>
         Build your vibe card
       </AppText>
       <AppText variant="body" muted style={{ marginBottom: space.lg }}>
-        keep it honest — clients love clarity.
+        Add your photo and details — clients will see this when you match.
       </AppText>
 
       <BeeCard>
-        <Pressable style={[styles.avatar, { borderColor: t.border }]}>
-          <Ionicons name="camera" size={28} color={t.muted} />
-          <AppText variant="caption" muted style={{ marginTop: space.xs }}>
-            add photo
-          </AppText>
+        <Pressable onPress={pickPhoto} disabled={saving} style={[styles.avatar, { borderColor: t.border }]}>
+          {pickedPhoto ? (
+            <Image source={{ uri: pickedPhoto.uri }} style={styles.avatarImg} />
+          ) : (
+            <>
+              <Ionicons name="camera" size={28} color={t.muted} />
+              <AppText variant="caption" muted style={{ marginTop: space.xs }}>
+                add photo
+              </AppText>
+            </>
+          )}
         </Pressable>
         <AppText variant="label" muted style={{ marginTop: space.md }}>
           DISPLAY NAME
@@ -61,6 +165,8 @@ export default function StudentSetup() {
         <TextInput
           value={name}
           onChangeText={setName}
+          placeholder="How you appear to clients"
+          placeholderTextColor={t.muted}
           style={[styles.input, { color: t.text, borderColor: t.border }]}
         />
       </BeeCard>
@@ -87,7 +193,7 @@ export default function StudentSetup() {
 
       <BeeCard>
         <AppText variant="subtitle" style={{ marginBottom: space.sm }}>
-          Hourly rate (USD)
+          Hourly rate (INR)
         </AppText>
         <TextInput
           keyboardType="number-pad"
@@ -101,6 +207,8 @@ export default function StudentSetup() {
         <TextInput
           value={note}
           onChangeText={setNote}
+          placeholder="e.g. Weeknights after 7pm IST"
+          placeholderTextColor={t.muted}
           style={[styles.input, { color: t.text, borderColor: t.border }]}
         />
         <View style={styles.switchRow}>
@@ -115,20 +223,8 @@ export default function StudentSetup() {
       </BeeCard>
 
       <View style={{ height: space.xl }} />
-      <BeeButton
-        title="Start swiping"
-        onPress={() => {
-          setProfile({
-            displayName: name,
-            skills,
-            hourlyRate: Number(rate) || 25,
-            availabilityNote: note,
-            availableNow,
-          });
-          finish();
-          router.replace('/(tabs)/discover');
-        }}
-      />
+      {saving ? <ActivityIndicator color={palette.black} style={{ marginBottom: space.md }} /> : null}
+      <BeeButton title="Start swiping" loading={saving} onPress={submit} />
     </Screen>
   );
 }
@@ -141,6 +237,11 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImg: {
+    width: '100%',
+    height: '100%',
   },
   input: {
     marginTop: space.sm,

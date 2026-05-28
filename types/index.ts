@@ -42,10 +42,20 @@ export interface NotificationItem {
   id: string;
   title: string;
   body: string;
-  type: 'match' | 'task' | 'payment';
+  type: 'match' | 'task' | 'payment' | 'application' | 'message' | 'requirement' | 'system';
   createdAt: string;
   read: boolean;
+  data?: unknown;
 }
+
+export type InboxThread = {
+  id: string;
+  name: string;
+  peerPhotoUrl?: string;
+  last: string;
+  time: string;
+  unread: number;
+};
 
 export interface StudentProfile {
   displayName: string;
@@ -54,4 +64,7 @@ export interface StudentProfile {
   hourlyRate: number;
   availabilityNote: string;
   availableNow: boolean;
+  bio?: string;
+  /** Website or portfolio link */
+  portfolioUrl?: string;
 }

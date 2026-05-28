@@ -6,6 +6,6 @@ type UIState = {
 };
 
 export const useUIStore = create<UIState>((set) => ({
-  colorScheme: 'system',
+  colorScheme: 'light',
   setColorScheme: (colorScheme) => set({ colorScheme }),
 }));

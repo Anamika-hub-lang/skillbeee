@@ -1,0 +1,303 @@
+// SkillBee — Supabase Postgres + Prisma. App talks to Node API only (no Prisma in Expo).
+// Align `User.id` with `auth.users.id` (UUID). API may bootstrap User rows on first JWT.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// --- Enums ---
+
+enum UserRole {
+  student
+  client
+}
+
+enum RequirementCategory {
+  shopify
+  canva
+  video
+  framer
+  ai
+  resume
+  ppt
+  code
+}
+
+enum RequirementStatus {
+  open
+  matched
+  in_progress
+  completed
+  cancelled
+}
+
+enum TaskStep {
+  accepted
+  working
+  review
+  paid
+}
+
+enum ApplicationStatus {
+  pending
+  withdrawn
+  accepted
+  rejected
+}
+
+enum ProjectStatus {
+  active
+  paused
+  completed
+  cancelled
+}
+
+enum NotificationType {
+  match
+  task
+  payment
+  requirement
+  application
+  message
+  system
+}
+
+enum PaymentStatus {
+  created
+  authorized
+  captured
+  failed
+  refunded
+}
+
+enum TransactionKind {
+  credit
+  debit
+  hold
+  release
+}
+
+// --- Core auth-aligned user ---
+
+model User {
+  id                String    @id @db.Uuid
+  email             String    @unique
+  role              UserRole
+  emailVerifiedAt   DateTime?
+  lastSignInAt      DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  profile           Profile?
+  requirements      Requirement[]       @relation("ClientRequirements")
+  applications      Application[]       @relation("StudentApplications")
+  sentMessages      Message[]           @relation("MessageSender")
+  notifications     Notification[]
+  projectsAsClient  Project[]           @relation("ProjectClient")
+  projectsAsStudent Project[]           @relation("ProjectStudent")
+  paymentsAsPayer   Payment[]           @relation("PaymentPayer")
+  transactions      Transaction[]       @relation("UserTransactions")
+  activityLogs      ActivityLog[]       @relation("ActorLogs")
+
+  @@index([role])
+  @@map("users")
+}
+
+/// Extended profile (1:1 with User). `userId` is the canonical id used across relations.
+model Profile {
+  userId           String    @id @db.Uuid
+  displayName      String?
+  photoUrl         String?
+  skills           String[]  @default([])
+  hourlyRate       Float     @default(0)
+  availabilityNote String?   @db.Text
+  availableNow     Boolean   @default(false)
+  portfolioUrl     String?
+  bio              String?   @db.Text
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("profiles")
+}
+
+model Requirement {
+  id            String                @id @default(uuid()) @db.Uuid
+  clientId      String                @db.Uuid
+  title         String
+  description   String                @db.Text
+  budget        Int
+  currency      String                @default("INR")
+  deadlineHours Int
+  urgent        Boolean               @default(false)
+  category      RequirementCategory
+  imageUrl      String?
+  status        RequirementStatus     @default(open)
+  currentStep   TaskStep?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  client        User                  @relation("ClientRequirements", fields: [clientId], references: [id], onDelete: Cascade)
+  skills        RequirementSkill[]
+  applications  Application[]
+  messages      Message[]
+  project       Project?
+  payments      Payment[]
+
+  @@index([status, createdAt])
+  @@index([clientId, status])
+  @@map("requirements")
+}
+
+model RequirementSkill {
+  requirementId String @db.Uuid
+  name          String
+  requirement   Requirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+
+  @@id([requirementId, name])
+  @@map("requirement_skills")
+}
+
+model Application {
+  id              String            @id @default(uuid()) @db.Uuid
+  requirementId   String            @db.Uuid
+  studentId       String            @db.Uuid
+  status          ApplicationStatus @default(pending)
+  coverNote       String?           @db.Text
+  /// Public URLs of work samples (images/files) shown to the client when reviewing applicants.
+  sampleUrls      String[]          @default([])
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  requirement Requirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  student     User        @relation("StudentApplications", fields: [studentId], references: [id], onDelete: Cascade)
+  project     Project?
+
+  @@unique([requirementId, studentId])
+  @@index([requirementId, status])
+  @@index([studentId, status])
+  @@map("applications")
+}
+
+/// Created when an application is accepted — single active project per requirement.
+model Project {
+  id             String        @id @default(uuid()) @db.Uuid
+  requirementId  String        @unique @db.Uuid
+  applicationId  String        @unique @db.Uuid
+  clientId       String        @db.Uuid
+  studentId      String        @db.Uuid
+  status         ProjectStatus @default(active)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  requirement Requirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  client      User        @relation("ProjectClient", fields: [clientId], references: [id], onDelete: Cascade)
+  student     User        @relation("ProjectStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  payments    Payment[]
+
+  @@index([clientId, status])
+  @@index([studentId, status])
+  @@map("projects")
+}
+
+model Message {
+  id              String    @id @default(uuid()) @db.Uuid
+  requirementId   String    @db.Uuid
+  senderId        String    @db.Uuid
+  body            String    @db.Text
+  attachmentUri   String?
+  isVoice         Boolean   @default(false)
+  readAt          DateTime?
+  createdAt       DateTime  @default(now())
+
+  requirement Requirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  sender      User        @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([requirementId, createdAt])
+  @@index([senderId])
+  @@map("messages")
+}
+
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @db.Uuid
+  title     String
+  body      String           @db.Text
+  type      NotificationType
+  read      Boolean          @default(false)
+  data      Json?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read, createdAt])
+  @@map("notifications")
+}
+
+model Payment {
+  id                 String        @id @default(uuid()) @db.Uuid
+  razorpayOrderId    String?       @unique
+  razorpayPaymentId  String?       @unique
+  razorpaySignature  String?
+  amountMinor        Int
+  currency           String        @default("INR")
+  status             PaymentStatus @default(created)
+  payerId            String        @db.Uuid
+  requirementId      String?       @db.Uuid
+  projectId          String?       @db.Uuid
+  failureReason      String?       @db.Text
+  metadata           Json?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  payer       User         @relation("PaymentPayer", fields: [payerId], references: [id], onDelete: Cascade)
+  requirement Requirement? @relation(fields: [requirementId], references: [id], onDelete: SetNull)
+  project     Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  ledger      Transaction[]
+
+  @@index([payerId, status])
+  @@index([status, createdAt])
+  @@map("payments")
+}
+
+model Transaction {
+  id          String            @id @default(uuid()) @db.Uuid
+  userId      String            @db.Uuid
+  paymentId   String?           @db.Uuid
+  kind        TransactionKind
+  amountMinor Int
+  currency    String            @default("INR")
+  label       String
+  metadata    Json?
+  createdAt   DateTime          @default(now())
+
+  user    User     @relation("UserTransactions", fields: [userId], references: [id], onDelete: Cascade)
+  payment Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@map("transactions")
+}
+
+model ActivityLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  actorUserId String?  @db.Uuid
+  targetType  String
+  targetId    String?  @db.Uuid
+  action      String
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  actor User? @relation("ActorLogs", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([targetType, targetId])
+  @@index([actorUserId, createdAt])
+  @@map("activity_logs")
+}

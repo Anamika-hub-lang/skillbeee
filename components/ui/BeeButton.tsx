@@ -49,7 +49,7 @@ export function BeeButton({
         void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         onPress();
       }}
-      style={({ pressed }) => [
+      style={({ pressed }: { pressed: boolean }) => [
         styles.base,
         {
           backgroundColor: bg,

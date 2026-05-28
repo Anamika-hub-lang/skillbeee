@@ -1,12 +1,12 @@
 import { ReactNode } from 'react';
-import { StyleSheet, View, ViewStyle } from 'react-native';
+import { StyleSheet, View, ViewStyle, type StyleProp } from 'react-native';
 
 import { useThemeColors } from '@/hooks/useThemeColors';
-import { radii, shadows, space } from '@/theme';
+import { palette, radii, shadows, space } from '@/theme';
 
 type Props = {
   children: ReactNode;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   padded?: boolean;
   tone?: 'default' | 'yellow' | 'cream';
 };
@@ -36,5 +36,7 @@ export function BeeCard({ children, style, padded = true, tone = 'default' }: Pr
 const styles = StyleSheet.create({
   card: {
     borderRadius: radii.xl,
+    borderWidth: 2,
+    borderColor: palette.yellow,
   },
 });

@@ -1,17 +1,17 @@
 {
   "expo": {
-    "name": "skillbeee",
-    "slug": "skillbeee",
+    "name": "SkillBee",
+    "slug": "skillbee",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "skillbeee",
-    "userInterfaceStyle": "automatic",
+    "scheme": "skillbee",
+    "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/splash-icon.png",
+      "image": "./assets/images/skillbee-logo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#FFC629"
     },
     "ios": {
       "supportsTablet": true
@@ -21,8 +21,10 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
+      "usesCleartextTraffic": true,
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": ["POST_NOTIFICATIONS"]
     },
     "web": {
       "bundler": "metro",
@@ -30,8 +32,27 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#FFC629",
+          "defaultChannel": "default"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "SkillBee uses your photos so you can attach work samples when applying to gigs."
+        }
+      ]
     ],
+    "extra": {
+      "supabaseUrl": "",
+      "supabaseAnonKey": ""
+    },
     "experiments": {
       "typedRoutes": true
     }

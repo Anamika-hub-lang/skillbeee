@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import {
@@ -7,76 +8,137 @@ import {
   ListRenderItem,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  Pressable,
   StyleSheet,
+  Text,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppText } from '@/components/ui/AppText';
-import { BeeButton } from '@/components/ui/BeeButton';
-import { Screen } from '@/components/ui/Screen';
+import { SkillBeeLogo } from '@/components/brand/SkillBeeLogo';
 import { useSessionStore } from '@/stores/session';
-import { palette, radii, space } from '@/theme';
+import { fontSizes, fontWeights, layout, palette, radii, space } from '@/theme';
 
-type Slide = { key: string; title: string; body: string; emoji: string };
+const { width } = Dimensions.get('window');
+
+type Slide = {
+  key: string;
+  image: number;
+  titleLine1?: string;
+  titleHighlight?: string;
+  title?: string;
+  body: string;
+  bodyHighlight?: string;
+  final?: boolean;
+};
 
 const SLIDES: Slide[] = [
   {
     key: '1',
-    title: 'Swipe quick gigs',
-    body: '1–4 hour wins. no corporate energy.',
-    emoji: '⚡️',
+    image: require('@/assets/images/onboarding-1.png'),
+    titleLine1: 'Turn your skills',
+    titleHighlight: 'into cash.',
+    body: 'Quick tasks in video editing, coding, and design.',
   },
   {
     key: '2',
-    title: 'Match. chat. ship.',
-    body: 'instant convos with clients who respect your time.',
-    emoji: '💬',
+    image: require('@/assets/images/onboarding-2.png'),
+    title: 'Instant buzz matching.',
+    body: 'Set your status to Active and get matched with local clients who need your skills right now. No more waiting, just buzzing.',
+    bodyHighlight: 'Active',
   },
   {
     key: '3',
-    title: 'Get paid like a founder',
-    body: 'track milestones, releases, and weekly earnings in one flow.',
-    emoji: '💸',
+    image: require('@/assets/images/onboarding-3.png'),
+    title: 'Flex your schedule.',
+    body: 'Earn in the Honey Pot during weekends or between your classes. Work when you want.',
+    bodyHighlight: 'Honey Pot',
+    final: true,
   },
 ];
 
-const { width } = Dimensions.get('window');
+const CREAM = '#FAF7EF';
+const OLIVE = '#3D3428';
+
+function HighlightedBody({ text, highlight }: { text: string; highlight?: string }) {
+  if (!highlight || !text.includes(highlight)) {
+    return <Text style={styles.body}>{text}</Text>;
+  }
+  const [before, after] = text.split(highlight);
+  return (
+    <Text style={styles.body}>
+      {before}
+      <Text style={styles.bodyHighlight}>{highlight}</Text>
+      {after}
+    </Text>
+  );
+}
 
 export default function Onboarding() {
   const router = useRouter();
   const complete = useSessionStore((s) => s.completeOnboarding);
   const [page, setPage] = useState(0);
-  const listRef = useRef<FlatList>(null);
+  const listRef = useRef<FlatList<Slide>>(null);
+
+  const finish = () => {
+    complete();
+    router.replace('/auth/login');
+  };
 
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const x = e.nativeEvent.contentOffset.x;
     setPage(Math.round(x / width));
   };
 
+  const goNext = () => {
+    if (page < SLIDES.length - 1) {
+      listRef.current?.scrollToOffset({ offset: (page + 1) * width, animated: true });
+      return;
+    }
+    finish();
+  };
+
   const renderItem: ListRenderItem<Slide> = ({ item }) => (
     <View style={[styles.slide, { width }]}>
-      <View style={styles.heroCard}>
-        <AppText style={styles.emoji}>{item.emoji}</AppText>
-        <AppText variant="hero" style={styles.title}>
-          {item.title}
-        </AppText>
-        <AppText variant="body" muted center style={styles.body}>
-          {item.body}
-        </AppText>
+      <View style={styles.artFrame}>
+        <Image source={item.image} style={styles.art} contentFit="cover" />
+      </View>
+
+      <View style={styles.copy}>
+        {item.titleLine1 ? (
+          <View style={styles.titleStack}>
+            <Text style={styles.title}>{item.titleLine1}</Text>
+            {item.titleHighlight ? (
+              <View style={styles.titlePill}>
+                <Text style={styles.titlePillText}>{item.titleHighlight}</Text>
+              </View>
+            ) : null}
+          </View>
+        ) : (
+          <Text style={styles.title}>{item.title}</Text>
+        )}
+        <HighlightedBody text={item.body} highlight={item.bodyHighlight} />
       </View>
     </View>
   );
 
+  const isFinal = page === SLIDES.length - 1;
+
   return (
-    <Screen scroll={false} edges={['top', 'bottom', 'left', 'right']}>
-      <View style={styles.topRow}>
-        <AppText variant="caption" style={{ letterSpacing: 4, fontWeight: '800' }}>
-          SKILLBEE
-        </AppText>
-        <Ionicons name="sparkles" size={22} color={palette.black} />
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
+      <View style={styles.header}>
+        {!isFinal ? <SkillBeeLogo size="header" /> : <View style={styles.headerSpacer} />}
+        <Pressable
+          onPress={finish}
+          hitSlop={12}
+          style={[styles.skipBtn, isFinal && styles.skipBtnFinal]}
+          accessibilityRole="button"
+          accessibilityLabel="Skip onboarding">
+          <Text style={[styles.skipText, isFinal && styles.skipTextFinal]}>Skip</Text>
+        </Pressable>
       </View>
 
-      <FlatList
+      <FlatList<Slide>
         ref={listRef}
         data={SLIDES}
         keyExtractor={(i) => i.key}
@@ -86,8 +148,20 @@ export default function Onboarding() {
         showsHorizontalScrollIndicator={false}
         onScroll={onScroll}
         scrollEventThrottle={16}
-        style={{ flexGrow: 0 }}
+        style={styles.list}
       />
+
+      {isFinal ? (
+        <View style={styles.progressWrap}>
+          <View style={styles.progressTrack}>
+            <View style={styles.progressFill} />
+          </View>
+          <View style={styles.progressLabels}>
+            <Text style={styles.progressLabel}>Step 3 of 3</Text>
+            <Text style={styles.progressLabel}>Setup Complete</Text>
+          </View>
+        </View>
+      ) : null}
 
       <View style={styles.dots}>
         {SLIDES.map((s, i) => (
@@ -95,88 +169,193 @@ export default function Onboarding() {
             key={s.key}
             style={[
               styles.dot,
-              { opacity: i === page ? 1 : 0.35, transform: [{ scale: i === page ? 1.1 : 1 }] },
+              i === page && (isFinal ? styles.dotActiveFinal : styles.dotActive),
             ]}
           />
         ))}
       </View>
 
       <View style={styles.footer}>
-        <BeeButton
-          title={page < SLIDES.length - 1 ? 'Next' : "Let's go"}
-          onPress={() => {
-            if (page < SLIDES.length - 1) {
-              listRef.current?.scrollToOffset({
-                offset: (page + 1) * width,
-                animated: true,
-              });
-            } else {
-              complete();
-              router.replace('/auth/login');
-            }
-          }}
-        />
+        <Pressable style={styles.nextBtn} onPress={goNext} accessibilityRole="button">
+          <Text style={styles.nextBtnText}>{isFinal ? 'Get Started' : 'Next'}</Text>
+          <Ionicons name="arrow-forward" size={22} color={OLIVE} />
+        </Pressable>
       </View>
-    </Screen>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  topRow: {
+  safe: {
+    flex: 1,
+    backgroundColor: CREAM,
+  },
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: space.lg,
-    paddingTop: space.md,
-    paddingBottom: space.lg,
+    paddingHorizontal: layout.screenPaddingX,
+    paddingTop: space.sm,
+    paddingBottom: space.md,
+    minHeight: 52,
+  },
+  headerSpacer: {
+    width: 132,
+  },
+  skipBtn: {
+    paddingHorizontal: space.md,
+    paddingVertical: space.xs,
+  },
+  skipBtnFinal: {
+    backgroundColor: 'rgba(10,10,10,0.06)',
+    borderRadius: radii.pill,
+  },
+  skipText: {
+    fontSize: fontSizes.md,
+    fontWeight: fontWeights.bold,
+    color: palette.gray600,
+  },
+  skipTextFinal: {
+    color: palette.gray500,
+    fontWeight: fontWeights.medium,
+  },
+  list: {
+    flex: 1,
   },
   slide: {
-    paddingHorizontal: space.lg,
-    justifyContent: 'center',
+    paddingHorizontal: layout.screenPaddingX,
+    paddingTop: space.xs,
   },
-  heroCard: {
-    backgroundColor: palette.white,
+  artFrame: {
+    width: '100%',
+    aspectRatio: 1,
+    maxHeight: width - layout.screenPaddingX * 2,
     borderRadius: radii.xxl,
-    paddingVertical: space.xxxl,
-    paddingHorizontal: space.lg,
-    alignItems: 'center',
+    overflow: 'hidden',
+    backgroundColor: palette.white,
+    alignSelf: 'center',
     ...StyleSheet.flatten([
       {
         shadowColor: '#000',
-        shadowOpacity: 0.1,
-        shadowRadius: 24,
-        shadowOffset: { width: 0, height: 14 },
-        elevation: 8,
+        shadowOpacity: 0.08,
+        shadowRadius: 20,
+        shadowOffset: { width: 0, height: 8 },
+        elevation: 6,
       },
     ]),
   },
-  emoji: {
-    fontSize: 72,
-    marginBottom: space.lg,
+  art: {
+    width: '100%',
+    height: '100%',
+  },
+  copy: {
+    marginTop: space.lg,
+    paddingHorizontal: space.xs,
+  },
+  titleStack: {
+    marginBottom: space.sm,
   },
   title: {
-    textAlign: 'center',
-    marginBottom: space.md,
+    fontSize: 34,
+    fontWeight: fontWeights.heavy,
+    color: palette.black,
+    letterSpacing: -0.8,
+    lineHeight: 40,
+    marginBottom: space.xs,
+  },
+  titlePill: {
+    alignSelf: 'flex-start',
+    backgroundColor: palette.black,
+    borderRadius: radii.pill,
+    paddingHorizontal: space.md,
+    paddingVertical: space.xs,
+    marginTop: space.xs,
+  },
+  titlePillText: {
+    fontSize: 32,
+    fontWeight: fontWeights.heavy,
+    color: palette.yellow,
     letterSpacing: -0.6,
   },
   body: {
-    textAlign: 'center',
+    fontSize: fontSizes.md,
     lineHeight: 24,
+    color: 'rgba(10,10,10,0.72)',
+    fontWeight: fontWeights.regular,
+  },
+  bodyHighlight: {
+    fontWeight: fontWeights.heavy,
+    color: palette.yellowDark,
+  },
+  progressWrap: {
+    paddingHorizontal: layout.screenPaddingX,
+    marginBottom: space.sm,
+  },
+  progressTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(10,10,10,0.08)',
+    overflow: 'hidden',
+  },
+  progressFill: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: palette.yellow,
+    borderRadius: 3,
+  },
+  progressLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: space.xs,
+  },
+  progressLabel: {
+    fontSize: fontSizes.xs,
+    color: palette.gray500,
+    fontWeight: fontWeights.medium,
   },
   dots: {
     flexDirection: 'row',
     justifyContent: 'center',
-    paddingVertical: space.lg,
+    alignItems: 'center',
+    gap: space.sm,
+    paddingVertical: space.md,
   },
   dot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: palette.black,
-    marginHorizontal: space.xs,
+    backgroundColor: 'rgba(10,10,10,0.15)',
+  },
+  dotActive: {
+    width: 28,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: palette.yellow,
+  },
+  dotActiveFinal: {
+    width: 28,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: OLIVE,
   },
   footer: {
-    paddingHorizontal: space.lg,
+    paddingHorizontal: layout.screenPaddingX,
     paddingBottom: space.lg,
+  },
+  nextBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space.sm,
+    backgroundColor: palette.yellow,
+    borderRadius: radii.pill,
+    minHeight: 56,
+    borderWidth: 2,
+    borderColor: palette.black,
+  },
+  nextBtnText: {
+    fontSize: fontSizes.lg,
+    fontWeight: fontWeights.heavy,
+    color: OLIVE,
   },
 });

@@ -1,0 +1,16 @@
+node_modules
+.git
+.expo
+dist
+**/.DS_Store
+app
+assets
+components
+hooks
+providers
+stores
+services
+theme
+types
+*.md
+.cursor

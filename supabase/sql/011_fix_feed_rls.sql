@@ -1,0 +1,13 @@
+-- SkillBee: fix posted tasks not appearing in live feed (client-home / student discover).
+--
+-- Root cause: RLS was enabled on public tables but almost no SELECT policies existed
+-- (only requirements INSERT). Posts saved via SECURITY DEFINER RPC, but feed queries
+-- returned zero rows.
+--
+-- Safe to re-run (idempotent). Applies the full policy set, then refreshes posting RPC.
+-- Equivalent to running 005_rls_secure_policies.sql then 010_fix_post_requirement.sql.
+--
+-- Apply (from repo root):
+--   Get-Content supabase/sql/005_rls_secure_policies.sql | npx prisma db execute --stdin --schema prisma/schema.prisma
+--   Get-Content supabase/sql/010_fix_post_requirement.sql | npx prisma db execute --stdin --schema prisma/schema.prisma
+--   Get-Content supabase/sql/012_fix_rls_recursion.sql | npx prisma db execute --stdin --schema prisma/schema.prisma

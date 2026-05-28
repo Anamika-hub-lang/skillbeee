@@ -1,0 +1,17 @@
+﻿# Lighten Cursor indexing / codebase scan (does not affect Metro or tsc).
+
+node_modules/
+.expo/
+dist/
+web-build/
+coverage/
+.next/
+out/
+build/
+android/
+ios/
+*.tsbuildinfo
+package-lock.json
+*.log
+.npm/
+.turbo/
