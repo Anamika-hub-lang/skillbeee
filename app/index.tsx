@@ -1,4 +1,5 @@
 import { Redirect, useRootNavigationState } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
@@ -36,8 +37,12 @@ export default function Entry() {
   const scale = useSharedValue(0.86);
 
   useEffect(() => {
-    const t = setTimeout(() => setMinElapsed(true), 5000);
+    const t = setTimeout(() => setMinElapsed(true), 2500);
     return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    void SplashScreen.hideAsync();
   }, []);
 
   useEffect(() => {

@@ -12,6 +12,7 @@ type SessionState = {
   setSupabaseAuthReady: (v: boolean) => void;
   onboardingComplete: boolean;
   completeOnboarding: () => void;
+  resetOnboarding: () => void;
   authFlowComplete: boolean;
   completeAuthFlow: () => void;
   isAuthenticated: boolean;
@@ -66,6 +67,7 @@ export const useSessionStore = create<SessionState>()(
       setSupabaseAuthReady: (v) => set({ supabaseAuthReady: v }),
       onboardingComplete: false,
       completeOnboarding: () => set({ onboardingComplete: true }),
+      resetOnboarding: () => set({ onboardingComplete: false }),
       authFlowComplete: false,
       completeAuthFlow: () => set({ authFlowComplete: true, isAuthenticated: true }),
       isAuthenticated: false,
@@ -98,6 +100,18 @@ export const useSessionStore = create<SessionState>()(
     }),
     {
       name: 'skillbee-session',
+      version: 1,
+      migrate: (persisted, fromVersion) => {
+        const state =
+          typeof persisted === 'object' && persisted !== null
+            ? (persisted as Record<string, unknown>)
+            : {};
+        if (fromVersion < 1) {
+          // v1: onboarding is only completed in the onboarding UI (not via server sync).
+          return { ...state, onboardingComplete: false };
+        }
+        return state;
+      },
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (s) => ({
         onboardingComplete: s.onboardingComplete,

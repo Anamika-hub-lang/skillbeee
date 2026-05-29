@@ -9,17 +9,17 @@ import {
   NativeScrollEvent,
   NativeSyntheticEvent,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SkillBeeLogo } from '@/components/brand/SkillBeeLogo';
 import { useSessionStore } from '@/stores/session';
 import { fontSizes, fontWeights, layout, palette, radii, space } from '@/theme';
-
-const { width } = Dimensions.get('window');
 
 type Slide = {
   key: string;
@@ -59,6 +59,7 @@ const SLIDES: Slide[] = [
 
 const CREAM = '#FAF7EF';
 const OLIVE = '#3D3428';
+const ART_BG = '#F5F2EA';
 
 function HighlightedBody({ text, highlight }: { text: string; highlight?: string }) {
   if (!highlight || !text.includes(highlight)) {
@@ -74,11 +75,41 @@ function HighlightedBody({ text, highlight }: { text: string; highlight?: string
   );
 }
 
+function SlideCopy({ item }: { item: Slide }) {
+  return (
+    <View style={styles.copy}>
+      {item.titleLine1 ? (
+        <View style={styles.titleStack}>
+          <Text style={styles.title}>{item.titleLine1}</Text>
+          {item.titleHighlight ? (
+            <View style={styles.titlePill}>
+              <Text style={styles.titlePillText}>{item.titleHighlight}</Text>
+            </View>
+          ) : null}
+        </View>
+      ) : (
+        <Text style={styles.title}>{item.title}</Text>
+      )}
+      <HighlightedBody text={item.body} highlight={item.bodyHighlight} />
+    </View>
+  );
+}
+
 export default function Onboarding() {
   const router = useRouter();
   const complete = useSessionStore((s) => s.completeOnboarding);
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const [page, setPage] = useState(0);
   const listRef = useRef<FlatList<Slide>>(null);
+
+  const isFinal = page === SLIDES.length - 1;
+  const footerHeight = isFinal ? 196 : 148;
+  const headerHeight = 56;
+  const slideHeight =
+    screenHeight - insets.top - insets.bottom - headerHeight - footerHeight;
+  const artWidth = screenWidth - layout.screenPaddingX * 2;
+  const artHeight = Math.min(artWidth * 0.72, 280);
 
   const finish = () => {
     complete();
@@ -87,42 +118,32 @@ export default function Onboarding() {
 
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const x = e.nativeEvent.contentOffset.x;
-    setPage(Math.round(x / width));
+    setPage(Math.round(x / screenWidth));
   };
 
   const goNext = () => {
     if (page < SLIDES.length - 1) {
-      listRef.current?.scrollToOffset({ offset: (page + 1) * width, animated: true });
+      listRef.current?.scrollToOffset({ offset: (page + 1) * screenWidth, animated: true });
       return;
     }
     finish();
   };
 
   const renderItem: ListRenderItem<Slide> = ({ item }) => (
-    <View style={[styles.slide, { width }]}>
-      <View style={styles.artFrame}>
-        <Image source={item.image} style={styles.art} contentFit="cover" />
+    <ScrollView
+      style={{ width: screenWidth, maxHeight: slideHeight }}
+      contentContainerStyle={styles.slideScroll}
+      showsVerticalScrollIndicator={false}
+      nestedScrollEnabled
+      bounces={false}>
+      <View style={[styles.slide, { width: screenWidth }]}>
+        <View style={[styles.artFrame, { width: artWidth, height: artHeight }]}>
+          <Image source={item.image} style={styles.art} contentFit="contain" />
+        </View>
+        <SlideCopy item={item} />
       </View>
-
-      <View style={styles.copy}>
-        {item.titleLine1 ? (
-          <View style={styles.titleStack}>
-            <Text style={styles.title}>{item.titleLine1}</Text>
-            {item.titleHighlight ? (
-              <View style={styles.titlePill}>
-                <Text style={styles.titlePillText}>{item.titleHighlight}</Text>
-              </View>
-            ) : null}
-          </View>
-        ) : (
-          <Text style={styles.title}>{item.title}</Text>
-        )}
-        <HighlightedBody text={item.body} highlight={item.bodyHighlight} />
-      </View>
-    </View>
+    </ScrollView>
   );
-
-  const isFinal = page === SLIDES.length - 1;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
@@ -148,38 +169,46 @@ export default function Onboarding() {
         showsHorizontalScrollIndicator={false}
         onScroll={onScroll}
         scrollEventThrottle={16}
-        style={styles.list}
+        style={{ maxHeight: slideHeight }}
+        getItemLayout={(_, index) => ({
+          length: screenWidth,
+          offset: screenWidth * index,
+          index,
+        })}
+        nestedScrollEnabled
       />
 
-      {isFinal ? (
-        <View style={styles.progressWrap}>
-          <View style={styles.progressTrack}>
-            <View style={styles.progressFill} />
+      <View style={styles.bottom}>
+        {isFinal ? (
+          <View style={styles.progressWrap}>
+            <View style={styles.progressTrack}>
+              <View style={styles.progressFill} />
+            </View>
+            <View style={styles.progressLabels}>
+              <Text style={styles.progressLabel}>Step 3 of 3</Text>
+              <Text style={styles.progressLabel}>Setup Complete</Text>
+            </View>
           </View>
-          <View style={styles.progressLabels}>
-            <Text style={styles.progressLabel}>Step 3 of 3</Text>
-            <Text style={styles.progressLabel}>Setup Complete</Text>
-          </View>
+        ) : null}
+
+        <View style={styles.dots}>
+          {SLIDES.map((s, i) => (
+            <View
+              key={s.key}
+              style={[
+                styles.dot,
+                i === page && (isFinal ? styles.dotActiveFinal : styles.dotActive),
+              ]}
+            />
+          ))}
         </View>
-      ) : null}
 
-      <View style={styles.dots}>
-        {SLIDES.map((s, i) => (
-          <View
-            key={s.key}
-            style={[
-              styles.dot,
-              i === page && (isFinal ? styles.dotActiveFinal : styles.dotActive),
-            ]}
-          />
-        ))}
-      </View>
-
-      <View style={styles.footer}>
-        <Pressable style={styles.nextBtn} onPress={goNext} accessibilityRole="button">
-          <Text style={styles.nextBtnText}>{isFinal ? 'Get Started' : 'Next'}</Text>
-          <Ionicons name="arrow-forward" size={22} color={OLIVE} />
-        </Pressable>
+        <View style={styles.footer}>
+          <Pressable style={styles.nextBtn} onPress={goNext} accessibilityRole="button">
+            <Text style={styles.nextBtnText}>{isFinal ? 'Get Started' : 'Next'}</Text>
+            <Ionicons name="arrow-forward" size={22} color={OLIVE} />
+          </Pressable>
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -196,8 +225,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: layout.screenPaddingX,
     paddingTop: space.sm,
-    paddingBottom: space.md,
-    minHeight: 52,
+    paddingBottom: space.sm,
+    minHeight: 56,
   },
   headerSpacer: {
     width: 132,
@@ -219,28 +248,27 @@ const styles = StyleSheet.create({
     color: palette.gray500,
     fontWeight: fontWeights.medium,
   },
-  list: {
-    flex: 1,
+  slideScroll: {
+    paddingBottom: space.lg,
   },
   slide: {
     paddingHorizontal: layout.screenPaddingX,
     paddingTop: space.xs,
+    alignItems: 'center',
   },
   artFrame: {
-    width: '100%',
-    aspectRatio: 1,
-    maxHeight: width - layout.screenPaddingX * 2,
     borderRadius: radii.xxl,
     overflow: 'hidden',
-    backgroundColor: palette.white,
-    alignSelf: 'center',
+    backgroundColor: ART_BG,
+    alignItems: 'center',
+    justifyContent: 'center',
     ...StyleSheet.flatten([
       {
         shadowColor: '#000',
-        shadowOpacity: 0.08,
-        shadowRadius: 20,
-        shadowOffset: { width: 0, height: 8 },
-        elevation: 6,
+        shadowOpacity: 0.06,
+        shadowRadius: 16,
+        shadowOffset: { width: 0, height: 6 },
+        elevation: 4,
       },
     ]),
   },
@@ -251,16 +279,17 @@ const styles = StyleSheet.create({
   copy: {
     marginTop: space.lg,
     paddingHorizontal: space.xs,
+    width: '100%',
   },
   titleStack: {
     marginBottom: space.sm,
   },
   title: {
-    fontSize: 34,
+    fontSize: 32,
     fontWeight: fontWeights.heavy,
     color: palette.black,
     letterSpacing: -0.8,
-    lineHeight: 40,
+    lineHeight: 38,
     marginBottom: space.xs,
   },
   titlePill: {
@@ -272,7 +301,7 @@ const styles = StyleSheet.create({
     marginTop: space.xs,
   },
   titlePillText: {
-    fontSize: 32,
+    fontSize: 30,
     fontWeight: fontWeights.heavy,
     color: palette.yellow,
     letterSpacing: -0.6,
@@ -286,6 +315,9 @@ const styles = StyleSheet.create({
   bodyHighlight: {
     fontWeight: fontWeights.heavy,
     color: palette.yellowDark,
+  },
+  bottom: {
+    marginTop: 'auto',
   },
   progressWrap: {
     paddingHorizontal: layout.screenPaddingX,
@@ -318,7 +350,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: space.sm,
-    paddingVertical: space.md,
+    paddingVertical: space.sm,
   },
   dot: {
     width: 8,
@@ -340,7 +372,7 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingHorizontal: layout.screenPaddingX,
-    paddingBottom: space.lg,
+    paddingBottom: space.md,
   },
   nextBtn: {
     flexDirection: 'row',

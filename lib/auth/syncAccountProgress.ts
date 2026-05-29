@@ -100,7 +100,6 @@ export async function syncAccountProgressFromServer(): Promise<AccountProgress> 
     } else if (profileComplete) {
       latest.completeStudentSetup();
     }
-    latest.completeOnboarding();
   }
 
   return { role, profileComplete };
